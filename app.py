@@ -3,7 +3,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 
-# 1. Bağlantı Ayarları
+# Bağlantı
 s = st.secrets["gcp_service_account"]
 creds_dict = {
     "type": s["type"],
@@ -18,13 +18,12 @@ scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapi
 creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
 client = gspread.authorize(creds)
 
-# 2. Tabloyu Aç
-# Senin Sheet ID'n: 1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8
-sh = client.open_by_key("1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8")
+# Tabloyu Aç
+sh = client.open_by_key("1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8") #
 worksheet = sh.get_worksheet(0)
 
-# 3. Ekrana Bas
-st.title("Ders RPG")
+# Veriyi Göster
+st.title("Ders RPG Kontrol Paneli")
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
-st.table(df)
+st.dataframe(df)
