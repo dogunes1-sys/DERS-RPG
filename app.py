@@ -9,7 +9,7 @@ def get_worksheet():
     # Secrets'tan bilgileri çek
     s = st.secrets["gcp_service_account"]
     
-    # Credentials sözlüğünü oluştur (Replace kullanmaya gerek kalmadı)
+    # Credentials sözlüğünü oluştur
     creds_dict = {
         "type": s["type"],
         "project_id": s["project_id"],
@@ -23,7 +23,7 @@ def get_worksheet():
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(creds)
     
-    # Senin Sheet ID'n
+    # Tabloyu aç
     sh = client.open_by_key("1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8")
     return sh.get_worksheet(0)
 
@@ -39,7 +39,7 @@ try:
         st.dataframe(df, use_container_width=True)
 
         st.divider()
-        st.subheader("🧙‍♂️ Kahraman Yönetimi")
+        st.subheader("🧙‍♂️ XP Yönetimi")
         
         col1, col2 = st.columns(2)
         with col1:
