@@ -7,39 +7,47 @@ import re
 st.set_page_config(page_title="Ders RPG", layout="wide")
 st.title("🎮 Ders RPG Kontrol Paneli")
 
-def clean_key(key):
-    # Anahtar içindeki hatalı kaçış karakterlerini ve gizli boşlukları temizler
-    if not key: return ""
-    key = key.replace("\\n", "\n")
-    # Eğer anahtar tek satır geldiyse, her 64 karakterde bir satır başı ekleyerek onarır
-    if "-----BEGIN PRIVATE KEY-----" in key and "\n" not in key[28:-26]:
-        header = "-----BEGIN PRIVATE KEY-----\n"
-        footer = "\n-----END PRIVATE KEY-----"
-        content = key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").replace(" ", "").replace("\n", "")
-        content = "\n".join(re.findall('.{1,64}', content))
-        key = header + content + footer
-    return key
+def sanitize_private_key(key_contents):
+    """Anahtar içindeki tüm format bozukluklarını (boşluk, alt çizgi, \n) temizler."""
+    if not key_contents:
+        return ""
+    
+    # 1. Adım: Başlık ve sonu ayır, ortadaki base64 kısmını al
+    # Tüm \n, \\n ve boşlukları temizle
+    clean_content = key_contents.replace("-----BEGIN PRIVATE KEY-----", "")
+    clean_content = clean_content.replace("-----END PRIVATE KEY-----", "")
+    clean_content = clean_content.replace("\\n", "").replace("\n", "").replace(" ", "").strip()
+    
+    # 2. Adım: Google'ın beklediği 64 karakterlik satırlara böl
+    lines = [clean_content[i:i+64] for i in range(0, len(clean_content), 64)]
+    
+    # 3. Adım: Başlık ve sonu tertemiz şekilde yeniden inşa et
+    formatted_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(lines) + "\n-----END PRIVATE KEY-----\n"
+    return formatted_key
 
 try:
     if "gcp_service_account" not in st.secrets:
-        st.error("Secrets bulunamadı!")
+        st.error("Secrets kutusu boş!")
     else:
+        # Secrets'tan bilgileri al
         creds_info = dict(st.secrets["gcp_service_account"])
-        # Anahtarı temizleme fonksiyonundan geçiriyoruz
-        creds_info["private_key"] = clean_key(creds_info.get("private_key", ""))
         
+        # ANAHTARI AMELİYAT ET
+        raw_key = creds_info.get("private_key", "")
+        creds_info["private_key"] = sanitize_private_key(raw_key)
+        
+        # Google bağlantısı
         scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
         client = gspread.authorize(creds)
         
+        # Tabloyu aç
         sh = client.open_by_key("1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8")
         df = pd.DataFrame(sh.get_worksheet(0).get_all_records())
         
-        if not df.empty:
-            st.success("✨ Bağlantı kuruldu! Öğrenci verileri yüklendi.")
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.warning("⚠️ Tabloya bağlanıldı ama içerik boş. Lütfen 2. satıra bir veri ekleyin!")
+        st.success("✅ BAĞLANTI BAŞARILI! Veriler aşağıda:")
+        st.dataframe(df, use_container_width=True)
 
 except Exception as e:
-    st.error(f"❌ Bağlantı Hatası: {e}")
+    st.error(f"❌ Hala bir sorun var: {e}")
+    st.info("İpucu: Eğer hala PEM hatası veriyorsa, Secrets kutusunda 'private_key' değerinin tırnak içinde olduğundan emin olun.")
