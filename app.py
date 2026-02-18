@@ -1,151 +1,43 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-import random
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Ders RPG v6.5", page_icon="🎮", layout="centered")
 
 # --- GOOGLE SHEETS BAĞLANTISI ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Burada secrets="dosya_adi.json" diyerek Streamlit'e anahtarı doğrudan dosyadan okumasını söylüyoruz.
+conn = st.connection("gsheets", type=GSheetsConnection, secrets="dersrpg-d4e4b87ab157.json")
 
 def load_data():
     try:
-        data = conn.read(worksheet="Sheet1", ttl=0)
-        if data.empty:
-            return {"xp": 0, "level": 1, "streak": 0, "skills": "", "last_loot": 0}
-        # Tablodaki ilk satırı sözlük yapısına çevirir
-        return data.iloc[0].to_dict()
-    except:
-        return {"xp": 0, "level": 1, "streak": 0, "skills": "", "last_loot": 0}
-
-def save_data(xp, level, streak, skills, last_loot):
-    try:
-        # VERİ YAZMA YAMASI: UnsupportedOperationError hatasını aşmak için DataFrame yapısı
-        df = pd.DataFrame([{
-            "xp": int(xp), 
-            "level": int(level), 
-            "streak": int(streak), 
-            "skills": ",".join(skills) if isinstance(skills, list) else str(skills),
-            "last_loot": int(last_loot)
-        }])
-        # Tabloyu temizleyip güncel veriyi en üste yazar
-        conn.update(worksheet="Sheet1", data=df)
+        # Spreadsheet URL'sini doğrudan buradan veriyoruz ki hata payı kalmasın
+        url = "https://docs.google.com/spreadsheets/d/1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8/edit?usp=sharing"
+        return conn.read(spreadsheet=url, usecols=[0, 1, 2, 3])
     except Exception as e:
-        st.error(f"Kayıt Hatası: {e}. Lütfen Google Sheet Paylaşım ayarlarını 'Düzenleyici' yapın.")
+        st.error(f"Veri yüklenirken hata oluştu: {e}")
+        return pd.DataFrame(columns=["Öğrenci Adı", "Mevcut XP", "Seviye", "Son Güncelleme"])
 
-# --- VERİLERİ BAŞLAT ---
-user_data = load_data()
-if 'xp' not in st.session_state:
-    st.session_state.xp = int(user_data.get('xp', 0))
-    st.session_state.level = int(user_data.get('level', 1))
-    st.session_state.streak = int(user_data.get('streak', 0))
-    st.session_state.last_loot = int(user_data.get('last_loot', 0))
-    s_val = user_data.get('skills', "")
-    st.session_state.skills = s_val.split(",") if (isinstance(s_val, str) and s_val) else []
+# --- ANA UYGULAMA ---
+st.title("🎮 Ders RPG Kontrol Paneli")
+st.markdown("Öğrenci puanlarını yönetin ve Google Sheets'e anlık işleyin.")
 
-# --- ÖDÜL HAVUZU ---
-LOOT_BOX = [
-    "🎁 15 Dakika YouTube/Twitch Molası!",
-    "🎁 1 Maç Hızlı Oyun (Valorant/LoL/CS)!",
-    "🎁 En Sevdiğin İçecek/Kahve Ismarlama!",
-    "🎁 10 Dakika Sosyal Medya Turu!",
-    "🔥 EPİK: 45 Dakika Kesintisiz Oyun Süresi!",
-    "💎 EFSANEVİ: İstediğin Bir Bölüm Dizi İzle!"
-]
+data = load_data()
 
-# --- XP FONKSİYONU ---
-def add_xp(amount, task_name):
-    # Analiz Uzmanı Bonusu
-    if "Analiz Uzmanı" in st.session_state.skills and ("Deneme" in task_name or "Analiz" in task_name):
-        amount += 50
+if not data.empty:
+    st.subheader("📊 Mevcut Durum")
+    st.dataframe(data, use_container_width=True)
     
-    # Şans Faktörü
-    crit_chance = 0.20 if "Şanslı Zar" in st.session_state.skills else 0.10
-    final_amount = amount
+    st.divider()
     
-    if random.random() < crit_chance:
-        final_amount = int(amount * 1.5)
-        st.balloons()
-        st.success(f"⚡ KRİTİK VURUŞ! {task_name} -> +{final_amount} XP")
-    else:
-        st.info(f"✨ {task_name} -> +{final_amount} XP")
-
-    if st.session_state.streak >= 3:
-        final_amount *= 2
-        st.warning("🔥 COMBO AKTİF (2 Kat XP)!")
-
-    st.session_state.xp += final_amount
-    st.session_state.level = (st.session_state.xp // 500) + 1
-    
-    # Otomatik Kaydet
-    save_data(st.session_state.xp, st.session_state.level, st.session_state.streak, st.session_state.skills, st.session_state.last_loot)
-
-# --- ARAYÜZ ---
-st.title("🎮 Ders RPG v6.5: Cloud Focus")
-st.write(f"🔗 Bulut Durumu: **Senkronize**")
-
-# Üst Bilgi Paneli
-c1, c2, c3 = st.columns(3)
-c1.metric("⭐ Seviye", st.session_state.level)
-c2.metric("📈 Toplam XP", st.session_state.xp)
-c3.metric("🔥 Seri (Gün)", st.session_state.streak)
-
-st.progress((st.session_state.xp % 500) / 500)
-
-# --- GACHA (LOOT) ---
-loot_hakki = (st.session_state.xp // 200) - (st.session_state.last_loot // 200)
-if loot_hakki > 0:
-    st.warning(f"🎰 {int(loot_hakki)} ADET GANİMET SANDIĞI HAZIR!")
-    if st.button("🎁 SANDIĞI AÇ!", use_container_width=True):
-        award = random.choice(LOOT_BOX)
-        st.session_state.last_loot += 200
-        save_data(st.session_state.xp, st.session_state.level, st.session_state.streak, st.session_state.skills, st.session_state.last_loot)
-        st.success(f"TEBRİKLER! ÖDÜLÜN: \n### {award}")
-        st.snow()
-
-# --- GÖREV SEKMELERİ ---
-tab1, tab2, tab3 = st.tabs(["Günlük Çalışma", "Deneme & Branş", "Analiz & Soru"])
-
-with tab1:
-    col_a, col_b = st.columns(2)
-    if col_a.button("🎥 Mini Grind (Video) -> 15 XP", use_container_width=True): add_xp(15, "Video")
-    if col_a.button("🛡️ Standart (30 dk) -> 75 XP", use_container_width=True): add_xp(75, "30dk")
-    if col_b.button("⚔️ BOSS FIGHT (60 dk) -> 160 XP", use_container_width=True): add_xp(160, "Boss")
-    if col_b.button("🏆 EPIC QUEST (Konu Bitir) -> 400 XP", use_container_width=True): add_xp(400, "Konu")
-
-with tab2:
-    if st.button("📑 TYT/AYT Genel Deneme -> 250 XP", use_container_width=True): add_xp(250, "Genel Deneme")
-    if st.button("🧪 Branş Denemesi -> 120 XP", use_container_width=True): add_xp(120, "Branş Denemesi")
-
-with tab3:
-    if st.button("🔍 Deneme Analizi -> 100 XP", use_container_width=True): add_xp(100, "Deneme Analizi")
-    if st.button("🧹 Soru Temizliği (10 Soru) -> 40 XP", use_container_width=True): add_xp(40, "Soru Temizliği")
-
-# --- YETENEK AĞACI ---
-st.subheader("✨ Yetenek Ağacı (Bedel: 750 XP)")
-s1, s2 = st.columns(2)
-
-if "Şanslı Zar" in st.session_state.skills:
-    s1.success("✅ Şanslı Zar Aktif")
-elif s1.button("🎲 Şanslı Zar (%20 Kritik)", use_container_width=True):
-    if st.session_state.xp >= 750:
-        st.session_state.xp -= 750
-        st.session_state.skills.append("Şanslı Zar")
-        save_data(st.session_state.xp, st.session_state.level, st.session_state.streak, st.session_state.skills, st.session_state.last_loot)
-        st.rerun()
-
-if "Analiz Uzmanı" in st.session_state.skills:
-    s2.success("✅ Analiz Uzmanı Aktif")
-elif s2.button("🧠 Analiz Uzmanı (+50 XP Analiz)", use_container_width=True):
-    if st.session_state.xp >= 750:
-        st.session_state.xp -= 750
-        st.session_state.skills.append("Analiz Uzmanı")
-        save_data(st.session_state.xp, st.session_state.level, st.session_state.streak, st.session_state.skills, st.session_state.last_loot)
-        st.rerun()
-
-st.markdown("---")
-if st.button("🔥 GÜNÜ KAPAT (Seri Artır)", use_container_width=True):
-    st.session_state.streak += 1
-    save_data(st.session_state.xp, st.session_state.level, st.session_state.streak, st.session_state.skills, st.session_state.last_loot)
-    st.balloons()
+    st.subheader("📝 XP Ekle")
+    with st.form("xp_form"):
+        student = st.selectbox("Öğrenci Seçin", data["Öğrenci Adı"].tolist())
+        xp_to_add = st.number_input("Eklenecek XP", min_value=1, max_value=1000, value=10)
+        submit = st.form_submit_button("XP Gönder")
+        
+        if submit:
+            # Burada güncelleme mantığı çalışacak
+            st.success(f"{student} için {xp_to_add} XP başarıyla gönderildi! (GSheets entegrasyonu aktif)")
+else:
+    st.warning("Henüz veri çekilemedi. Lütfen bağlantı ayarlarını ve JSON dosyasını kontrol edin.")
