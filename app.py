@@ -5,8 +5,10 @@ import pandas as pd
 st.set_page_config(page_title="Ders RPG", layout="centered")
 st.title("🎮 Ders RPG Kontrol Paneli")
 
-# --- KİMLİK BİLGİLERİ (ÇAKIŞMALAR TEMİZLENDİ) ---
-creds = {
+# --- KİMLİK BİLGİLERİ ---
+# Kütüphanenin tam olarak beklediği format budur.
+service_account_info = {
+    "type": "service_account",
     "project_id": "dersrpg",
     "private_key_id": "d4e4b87ab157fd2dd9a8f2aea0ea1bed5cefbe41",
     "private_key": "-----BEGIN PRIVATE KEY-----\n"
@@ -38,27 +40,28 @@ creds = {
                    "dBcFW0v/euIGpBbG+nTKgfs=\n"
                    "-----END PRIVATE KEY-----",
     "client_email": "ders-rpg-bot@dersrpg.iam.gserviceaccount.com",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
     "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/ders-rpg-bot%40dersrpg.iam.gserviceaccount.com"
 }
 
-# --- BAĞLANTI KURULUMU ---
+# --- BAĞLANTI ---
 try:
-    # Burada 'type' değerini sildik, sadece diğer verileri gönderiyoruz.
-    conn = st.connection("gsheets", type=GSheetsConnection, **creds)
+    # service_account_info'yu doğrudan bir parametre olarak gönderiyoruz
+    conn = st.connection("gsheets", 
+                         type=GSheetsConnection, 
+                         service_account=service_account_info)
     
-    # Senin tablonun linki
     url = "https://docs.google.com/spreadsheets/d/1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8/edit?usp=sharing"
-    
-    # Veriyi oku
     df = conn.read(spreadsheet=url)
 
     if not df.empty:
         st.subheader("📊 Öğrenci Listesi")
         st.dataframe(df, use_container_width=True)
-        st.success("Bağlantı sağlandı!")
     else:
-        st.warning("Veri çekildi ancak tablo boş görünüyor.")
+        st.warning("Veri çekildi ancak tablo boş.")
 
 except Exception as e:
-    st.error("Bağlantı sırasında teknik bir sorun oluştu.")
-    st.exception(e) # Bu sefer hatanın tam detayını ekrana basar
+    st.error("Bağlantı sağlanamadı.")
+    st.exception(e)
