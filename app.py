@@ -5,10 +5,8 @@ import pandas as pd
 st.set_page_config(page_title="Ders RPG", layout="centered")
 st.title("🎮 Ders RPG Kontrol Paneli")
 
-# --- KİMLİK BİLGİLERİ (DOĞRUDAN KODUN İÇİNDE) ---
-# Secrets panelindeki hataları baypas etmek için bilgileri buraya güvenli sözlük olarak alıyoruz.
+# --- KİMLİK BİLGİLERİ (ÇAKIŞMALAR TEMİZLENDİ) ---
 creds = {
-    "type": "service_account",
     "project_id": "dersrpg",
     "private_key_id": "d4e4b87ab157fd2dd9a8f2aea0ea1bed5cefbe41",
     "private_key": "-----BEGIN PRIVATE KEY-----\n"
@@ -43,21 +41,24 @@ creds = {
     "token_uri": "https://oauth2.googleapis.com/token",
 }
 
-# --- BAĞLANTI ---
+# --- BAĞLANTI KURULUMU ---
 try:
-    # Secrets kullanmadan doğrudan creds sözlüğünü gönderiyoruz
+    # Burada 'type' değerini sildik, sadece diğer verileri gönderiyoruz.
     conn = st.connection("gsheets", type=GSheetsConnection, **creds)
     
+    # Senin tablonun linki
     url = "https://docs.google.com/spreadsheets/d/1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8/edit?usp=sharing"
+    
+    # Veriyi oku
     df = conn.read(spreadsheet=url)
 
     if not df.empty:
         st.subheader("📊 Öğrenci Listesi")
         st.dataframe(df, use_container_width=True)
-        st.balloons() # Başarıyla yüklenirse küçük bir kutlama
+        st.success("Bağlantı sağlandı!")
     else:
-        st.warning("Veri çekildi ama tablo boş.")
+        st.warning("Veri çekildi ancak tablo boş görünüyor.")
 
 except Exception as e:
-    st.error("Bağlantı sırasında bir hata oluştu.")
-    st.code(e) # Hatayı açıkça görelim
+    st.error("Bağlantı sırasında teknik bir sorun oluştu.")
+    st.exception(e) # Bu sefer hatanın tam detayını ekrana basar
