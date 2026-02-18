@@ -21,7 +21,7 @@ def get_worksheet():
         scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
-        # Tablo ID'niz doğru
+        # Google Sheet ID
         sh = client.open_by_key("1NJob3RNvMZ43_JlG1hnaZmnF_I3bUW3BtW9bsNx6kB8")
         return sh.get_worksheet(0)
     except Exception as e:
@@ -31,17 +31,16 @@ def get_worksheet():
 worksheet = get_worksheet()
 
 if worksheet:
-    # Verileri çek ve boşlukları temizle
-    data = worksheet.get_all_values()
-    if len(data) > 1:
-        headers = data[0]
-        rows = data[1:]
+    # Verileri ham liste olarak çek (Daha güvenlidir)
+    all_values = worksheet.get_all_values()
+    
+    if len(all_values) > 1:
+        # İlk satırı başlık, kalanları veri yap
+        headers = [str(h).strip() for h in all_values[0]]
+        rows = all_values[1:]
         df = pd.DataFrame(rows, columns=headers)
         
-        # Sütun isimlerindeki gizli boşlukları temizleyelim
-        df.columns = df.columns.str.strip()
-        
-        st.success("✅ Ejderhalar evcilleştirildi! Veriler yayında.")
+        st.success("✅ Bağlantı aktif! Kahramanlar hazır.")
         st.dataframe(df, use_container_width=True)
 
         st.divider()
@@ -49,33 +48,35 @@ if worksheet:
 
         # XP Verme İşlemi
         col1, col2 = st.columns(2)
-        with col1:
-            # 'ogrenci' sütununa göre seçim yap
-            secilen_ogrenci = st.selectbox("Bir Kahraman Seç:", df["ogrenci"].tolist())
-        with col2:
-            eklenecek_xp = st.number_input("Eklenecek XP:", min_value=1, value=10, step=5)
+        
+        # Sütun isimlerini kontrol ederek (ogrenci ve xp) işlem yap
+        if "ogrenci" in df.columns and "xp" in df.columns:
+            with col1:
+                secilen = st.selectbox("Bir Kahraman Seç:", df["ogrenci"].tolist())
+            with col2:
+                miktar = st.number_input("Eklenecek XP:", min_value=1, value=10)
 
-        if st.button(f"✨ {secilen_ogrenci}'e XP Tanımla"):
-            try:
-                # Satır numarasını bul (indis 0'dan başladığı ve başlık olduğu için +2)
-                row_idx = df.index[df['ogrenci'] == secilen_ogrenci].tolist()[0] + 2
-                
-                # Mevcut XP'yi güvenli bir şekilde sayıya çevir
-                current_xp_val = df.loc[df['ogrenci'] == secilen_ogrenci, 'xp'].values[0]
-                current_xp = int(current_xp_val) if str(current_xp_val).isdigit() else 0
-                
-                new_xp = current_xp + eklenecek_xp
-                
-                # B sütunu (2. sütun) XP sütunudur
-                worksheet.update_cell(row_idx, 2, new_xp)
-                
-                st.balloons()
-                st.toast(f"{secilen_ogrenci} güçlendi! Yeni XP: {new_xp}")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Güncelleme hatası: {e}")
+            if st.button(f"✨ {secilen}'e XP Gönder"):
+                try:
+                    # Satır numarasını bul (indis 0 + başlık satırı + 1 = row_idx)
+                    row_idx = df.index[df['ogrenci'] == secilen].tolist()[0] + 2
+                    
+                    # Mevcut XP'yi sayıya çevir
+                    current_xp = int(df.loc[df['ogrenci'] == secilen, 'xp'].values[0])
+                    new_xp = current_xp + miktar
+                    
+                    # XP sütunu B sütunu (2. sütun)
+                    worksheet.update_cell(row_idx, 2, str(new_xp))
+                    
+                    st.balloons()
+                    st.success(f"{secilen} artık {new_xp} XP!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Güncelleme yapılamadı: {e}")
+        else:
+            st.error("Hata: Google Sheet'te 'ogrenci' veya 'xp' başlığı bulunamadı!")
     else:
-        st.warning("Tablo başlıkları var ama henüz hiç kahraman (satır) eklenmemiş.")
+        st.warning("Bağlantı başarılı ama tabloda başlık dışında veri yok.")
 
 if st.sidebar.button("🔄 Verileri Yenile"):
     st.rerun()
